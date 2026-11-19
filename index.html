@@ -333,14 +333,19 @@ function iniciar() {
   ensureAudio();
   if (iniciado) return;
   iniciado = true;
-  setBgVideo(bgVideo);
+  setBgVideo(vidCat[bgVideo] ?? 0);
   tuneTo(Math.floor(Math.random() * nAud()));
   stationNext = performance.now() + 3200;
 }
 
-function setBgVideo(i) {
+// Videos por categoría según su número: 1,4,7… movimiento · 2,5,8… cercanía · 3,6,9… voz.
+// Si hay varios de la misma categoría, se elige uno al azar.
+function setBgVideo(cat) {
   const n = media.vids.length;
-  bgVideo = n ? i % n : i % 3;
+  if (n) {
+    const ops = [...Array(n).keys()].filter(k => (vidCat[k] ?? k % 3) === cat % 3);
+    bgVideo = ops.length ? ops[Math.floor(Math.random() * ops.length)] : cat % n;
+  } else bgVideo = cat % 3;
   bgFlash = performance.now();
   if (!n) return;
   media.vids.forEach((v, k) => { if (k !== bgVideo) v.pause(); });
@@ -555,11 +560,11 @@ function textosCerrada(now) {
   const x0 = W / 2 - 280, x1 = W / 2 + 280, y = 548, n = nAud();
   ctx.strokeStyle = 'rgba(210,171,95,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
   for (let i = 0; i < n; i++) {
-    const x = lerp(x0, x1, i / (n - 1));
+    const x = lerp(x0, x1, i / Math.max(1, n - 1));
     ctx.fillStyle = i === station ? '#d2ab5f' : 'rgba(210,171,95,.45)'; ctx.fillRect(x - 1, y - 8, 2, 16);
   }
   const jit = now < burstUntil ? (Math.random() - .5) * 40 : 0;
-  const nx = lerp(x0, x1, station / (n - 1)) + jit;
+  const nx = lerp(x0, x1, station / Math.max(1, n - 1)) + jit;
   ctx.fillStyle = '#f05a5a'; ctx.fillRect(nx - 2, y - 16, 4, 32);
   ctx.fillStyle = '#d8cebf'; ctx.font = '15px system-ui,sans-serif'; ctx.textAlign = 'center';
   ctx.fillText(now < burstUntil ? 'sintonizando…' : `Suena: ${credAud[station] || 'voz ' + (station + 1)}`, W / 2, y + 36);
@@ -629,9 +634,9 @@ function interior(x, y, w, h, a, now) {
 
   ctx.save(); ctx.globalAlpha = a; rr(vx, vy, vw, vh, 10); ctx.clip();
   ctx.fillStyle = '#0b0908'; ctx.fillRect(vx, vy, vw, vh);
-  video(contenido.video, vx, vy, vw, vh, now, false);
+  video(bgVideo, vx, vy, vw, vh, now, false);
   ctx.restore();
-  if (a >= 1) etiqueta(`VIDEO ${contenido.video + 1} · lo abriste con ${VCAT[contenido.video]}`, vx, vy);
+  if (a >= 1) etiqueta(`VIDEO ${bgVideo + 1} · lo abriste con ${VCAT[contenido.video]}${credVid[bgVideo] ? ' · ' + credVid[bgVideo].split(' · ')[0] : ''}`, vx, vy);
 
   if (estado === ABIERTA && interp) {
     // Título
@@ -768,16 +773,25 @@ addEventListener('keydown', e => {
   else if (k === 'a') alternarArduino();
 });
 
+// Carga lo que diga medios.json (lo genera generar_medios.py a partir de la carpeta medios/).
+// Así cualquiera puede agregar fotos, audios o videos con el nombre que quiera.
+let vidCat = [];   // categoría de cada video: 0 movimiento · 1 cercanía · 2 voz
 async function autoload() {
-  const txt = async u => { const r = await fetch(u); if (!r.ok) throw 0; return (await r.text()).trim().split('\n'); };
+  const CATS = {movimiento: 0, cercania: 1, voz: 2};
+  const ruta = src => src.split('/').map(encodeURIComponent).join('/');
   try {
-    credImg = await txt('img/creditos.txt');
-    credAud = await txt('aud/creditos.txt').catch(() => []);
-    credVid = await txt('video/creditos.txt').catch(() => []);
-    media.imgs = credImg.map((_, i) => { const im = new Image(); im.src = `img/${i + 1}.jpg`; return im; });
-    media.auds = [...Array(7).keys()].map(i => { const a = new Audio(`aud/${i + 1}.mp3`); a.preload = 'auto'; a.loop = true; return a; });
-    media.vids = [...Array(3).keys()].map(i => { const v = document.createElement('video'); v.src = `video/${i + 1}.mp4`; v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; return v; });
-  } catch (e) { /* sin recursos: contenido de ejemplo */ }
+    const r = await fetch('medios.json', {cache: 'no-store'});
+    if (!r.ok) throw 0;
+    const m = await r.json();
+    credImg = m.imagenes.map(x => x.credito);
+    credAud = m.audios.map(x => x.credito);
+    credVid = m.videos.map(x => x.credito);
+    vidCat = m.videos.map(x => CATS[x.categoria] ?? 0);
+    media.imgs = m.imagenes.map(x => { const im = new Image(); im.src = ruta(x.src); return im; });
+    media.auds = m.audios.map(x => { const a = new Audio(ruta(x.src)); a.preload = 'auto'; a.loop = true; return a; });
+    media.vids = m.videos.map(x => { const v = document.createElement('video'); v.src = ruta(x.src); v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; return v; });
+    console.log(`Recursos: ${media.imgs.length} imágenes · ${media.auds.length} audios · ${media.vids.length} videos`);
+  } catch (e) { console.log('Sin medios.json: se usa contenido de ejemplo'); }
 }
 autoload().then(() => setBgVideo(0));
 addEventListener('pointerdown', () => iniciar());
@@ -792,9 +806,9 @@ $('file').onchange = e => {
     else if (f.type.startsWith('audio/')) { const au = new Audio(url); au.loop = true; auds.push(au); }
     else if (f.type.startsWith('video/')) { const v = document.createElement('video'); v.src = url; v.muted = true; v.loop = true; v.playsInline = true; vids.push(v); }
   }
-  if (imgs.length) media.imgs = imgs;
-  if (auds.length) media.auds = auds;
-  if (vids.length) media.vids = vids;
+  if (imgs.length) { media.imgs = imgs; credImg = []; }
+  if (auds.length) { media.auds = auds; credAud = []; }
+  if (vids.length) { media.vids = vids; vidCat = vids.map((_, i) => i % 3); credVid = []; }
   cerrar();
   caption(`Recursos cargados: ${media.imgs.length} imágenes · ${media.auds.length} audios · ${media.vids.length} videos`, 4000);
 };

@@ -1,0 +1,8 @@
+# Configuración para Render (Blueprint). También puedes crear el sitio a mano:
+# New → Static Site · Build Command: python3 generar_medios.py · Publish Directory: .
+services:
+  - type: web
+    name: la-maleta
+    runtime: static
+    buildCommand: python3 generar_medios.py
+    staticPublishPath: .

@@ -46,19 +46,26 @@ El Arduino envía una línea cada ~45 ms con el formato `sonido,inclinacion,prox
 ## Estructura del repositorio
 
 ```
-index.html        Simulación web del prototipo (este sitio)
-img/              30 fotografías de los ensayos (1.jpg … 30.jpg) + creditos.txt
-aud/              7 audios (1.mp3 … 7.mp3) + creditos.txt
-video/            3 videos (1.mp4 … 3.mp4) + creditos.txt
+index.html                  Simulación web del prototipo (lo que publica Render)
+medios/                     TODO el contenido de la maleta (lo usan la web y Processing)
+  imagenes/                 fotografías
+  audios/                   voces y paisajes sonoros
+  videos/movimiento/        videos que aparecen al inclinar la maleta
+  videos/cercania/          videos que aparecen al acercarse
+  videos/voz/               videos que aparecen con sonido
+  creditos.csv              créditos: archivo,credito
+medios.json                 lista de medios (se genera sola, no editar a mano)
+generar_medios.py           script que crea medios.json a partir de medios/
+.github/workflows/          acción que actualiza medios.json en cada cambio
+render.yaml                 configuración para publicar en Render
+Proyecto/Proyecto.pde       maleta física en Processing 4 (lee ../medios)
+arduino_sensores/           código del Arduino Uno
+CONTRIBUIR.md               cómo agregar fotos, audios o videos
 ```
 
-La versión para la maleta física (Processing + Arduino) está en `La_maleta_Proyecto.zip`:
+## ¿Quieres aportar contenido?
 
-```
-Proyecto/Proyecto.pde                    Programa principal en Processing 4
-Proyecto/img, aud, video                 Los mismos medios (imágenes en PNG)
-arduino_sensores/arduino_sensores.ino    Código del Arduino Uno
-```
+La maleta reconoce sola cualquier foto, audio o video que se agregue a `medios/`, con el nombre que sea. Lee **[CONTRIBUIR.md](CONTRIBUIR.md)**: se puede hacer desde la página de GitHub, sin instalar nada.
 
 ## Cómo usar la simulación web
 
@@ -73,16 +80,25 @@ Abre el sitio y haz un clic en la página para activar el sonido.
 | H | Ocultar los controles (para grabar) |
 | F11 | Pantalla completa |
 
-**Probarla en local:** dentro de la carpeta ejecuta `python -m http.server 8000` y abre `http://localhost:8000`. Si abres el `index.html` con doble clic, el navegador bloquea la carga de los créditos y se muestran imágenes de ejemplo.
+**Probarla en local:**
+```bash
+python3 generar_medios.py
+python3 -m http.server 8000      # abre http://localhost:8000
+```
+Si abres el `index.html` con doble clic, el navegador bloquea la lectura de `medios.json` y se muestra contenido de ejemplo.
 
-**Publicarla en Render:** New → Static Site → conecta este repositorio. Deja vacío el *Build Command* y usa `.` como *Publish Directory*.
+**Publicarla en Render:** New → Static Site → conecta este repositorio.
+- **Build Command:** `python3 generar_medios.py`
+- **Publish Directory:** `.`
+
+También puedes usar *New → Blueprint*, que lee `render.yaml`. Cada vez que alguien sube contenido, Render vuelve a publicar el sitio solo.
 
 ## Cómo ejecutar la maleta física
 
 1. Instala **Processing 4** y, desde *Sketch → Import Library → Manage Libraries*, las librerías **Video** y **Sound**.
-2. Sube `arduino_sensores.ino` al Arduino Uno desde Arduino IDE y cierra el Monitor Serie.
+2. Sube `arduino_sensores/arduino_sensores.ino` al Arduino Uno desde Arduino IDE y cierra el Monitor Serie.
 3. Abre `Proyecto/Proyecto.pde` y cambia `PUERTO_ARDUINO` por el puerto de tu placa.
-4. Ejecuta con **Run**. Sin Arduino conectado funciona en modo teclado (`i`, `p`, `s`, `f`). La tecla `d` muestra el panel de calibración.
+4. Ejecuta con **Run**. Al iniciar, el programa lee la carpeta `medios/` y muestra en la consola cuántos archivos encontró. Sin Arduino conectado funciona en modo teclado (`i`, `p`, `s`, `f`). La tecla `d` muestra el panel de calibración.
 
 **Calibración:** si el ruido del lugar dispara gestos solos, sube `UMBRAL_BAJO`. Si la proximidad funciona al revés, cambia `IR_ACTIVO_EN_LOW` a `false`.
 
