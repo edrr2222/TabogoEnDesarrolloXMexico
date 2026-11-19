@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>La maleta · simulación del prototipo</title>
+<style>
+:root{--bg:#0e0c0b;--panel:#171412;--line:#2e2723;--brass:#d2ab5f;--txt:#efe6d8;--mut:#9b8f80;--I:#f0b446;--P:#5ac8dc;--S:#c88ce6;--F:#f05a5a}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt)}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;background:var(--bg)}
+header{position:absolute;left:40px;top:26px;right:40px;height:86px;display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:16px}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:normal;font-size:40px;outline:none}
+.sub{color:var(--mut);font-size:18px;margin-top:6px;outline:none}
+.tag{color:var(--brass);font-size:14px;letter-spacing:.2em;text-transform:uppercase;text-align:right;line-height:1.6}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ptitle{position:absolute;left:24px;top:15px;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+.ptitle b{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--brass);color:#1a1410;margin-right:10px;font-size:14px}
+#left{left:40px;top:132px;width:760px;height:758px}
+#right{left:830px;top:132px;width:1050px;height:758px}
+#circuit{position:absolute;left:0;top:48px}
+#serialBox{position:absolute;left:24px;right:24px;top:540px;bottom:20px;background:#0a0908;border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-family:ui-monospace,Menlo,Consolas,monospace}
+#serialBox .h{font-family:system-ui,sans-serif;font-size:14px;color:var(--mut);display:flex;justify-content:space-between;margin-bottom:8px}
+#serialBox .h span:last-child{color:var(--brass)}
+#serial div{font-size:17px;line-height:22px;color:#7fa77f;white-space:pre}
+#serial div.hot{color:#f4e3a1}
+#cv{position:absolute;left:0;top:48px;width:1050px;height:700px}
+#cap{position:absolute;left:50%;top:62px;transform:translateX(-50%);max-width:900px;background:rgba(10,8,7,.88);border:1px solid var(--brass);color:var(--txt);padding:12px 22px;border-radius:30px;font-size:21px;text-align:center;opacity:0;transition:opacity .35s;pointer-events:none}
+#cap.on{opacity:1}
+#flow{position:absolute;left:40px;right:40px;top:906px;height:108px;display:flex;gap:14px}
+.step{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;position:relative;transition:border-color .25s,background .25s,transform .25s}
+.step:not(:last-child)::after{content:"";position:absolute;right:-12px;top:50%;width:10px;height:10px;border-top:2px solid var(--mut);border-right:2px solid var(--mut);transform:translateY(-50%) rotate(45deg)}
+.step .n{font-size:13px;color:var(--brass);letter-spacing:.15em}
+.step .t{font-size:21px;margin:4px 0 4px}
+.step .d{font-size:14px;color:var(--mut);line-height:1.3}
+.step.on{border-color:var(--brass);background:#2a2118;transform:translateY(-3px)}
+#controls{position:absolute;left:40px;right:40px;top:1028px;height:40px;display:flex;gap:10px;align-items:center}
+#controls button,#controls label{background:#221d19;border:1px solid var(--line);color:var(--txt);font:inherit;font-size:15px;padding:8px 14px;border-radius:8px;cursor:pointer}
+#controls button:hover,#controls label:hover{border-color:var(--brass)}
+#controls .g{font-weight:700;margin-right:6px}
+#controls .sep{flex:1}
+#controls .hint{color:var(--mut);font-size:13px}
+#stage.clean #controls{display:none}
+#left,#right{transition:opacity .35s}
+#stage.sinArduino #left{display:none}
+#stage.sinArduino #right{left:40px;width:1840px}
+#stage.sinArduino #right .ptitle{opacity:.85}
+svg text{font-family:system-ui,sans-serif}
+.sig{fill:none;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;transition:stroke-width .2s}
+.sig.on{stroke-width:8;filter:drop-shadow(0 0 6px currentColor)}
+.flowline{fill:none;stroke:#fff;stroke-width:3;stroke-dasharray:6 18;opacity:0;stroke-linecap:round}
+.flowline.on{opacity:.9;animation:dash .5s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-24}}
+.board{transition:stroke .2s,stroke-width .2s}
+.board.on{stroke:#d2ab5f;stroke-width:4}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div>
+      <h1 contenteditable="true" spellcheck="false">¿Qué hay dentro de la maleta?</h1>
+      <div class="sub" contenteditable="true" spellcheck="false">Cómo funciona el prototipo: el contenido del Museo Nacional de Antropología fluye, los gestos del visitante lo fijan y la maleta interpreta su interacción</div>
+    </div>
+    <div class="tag">Multimedia Experimental<br>Museografías Indisciplinadas</div>
+  </header>
+
+  <section class="panel" id="left">
+    <div class="ptitle"><b>1</b>Sensores → Arduino</div>
+    <svg id="circuit" width="760" height="490" viewBox="0 0 760 490"></svg>
+    <div id="serialBox">
+      <div class="h"><span>Monitor serie · 115200 baudios · USB hacia Processing</span><span>sonido , inclinación , proximidad</span></div>
+      <div id="serial"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="right">
+    <div class="ptitle"><b>2</b>La maleta en pantalla (Processing)</div>
+    <canvas id="cv"></canvas>
+    <div id="cap"></div>
+  </section>
+
+  <div id="flow">
+    <div class="step" data-s="0"><div class="n">01</div><div class="t">Gesto</div><div class="d">La persona inclina, se acerca o hace sonido</div></div>
+    <div class="step" data-s="1"><div class="n">02</div><div class="t">Sensor</div><div class="d">Inclinación D3 · infrarrojo D4 · sonido A0</div></div>
+    <div class="step" data-s="2"><div class="n">03</div><div class="t">Arduino</div><div class="d">Lee los sensores y envía datos por USB</div></div>
+    <div class="step" data-s="3"><div class="n">04</div><div class="t">Processing</div><div class="d">Convierte lecturas en gestos y fija el contenido</div></div>
+    <div class="step" data-s="4"><div class="n">05</div><div class="t">Patrón</div><div class="d">5 fragmentos fijados + ritmo desbloquean</div></div>
+    <div class="step" data-s="5"><div class="n">06</div><div class="t">Contenido</div><div class="d">Se fija lo que pasaba y la maleta lo interpreta</div></div>
+  </div>
+
+  <div id="controls">
+    <button data-g="I"><span class="g">I</span>Inclinar</button>
+    <button data-g="P"><span class="g">P</span>Acercar mano</button>
+    <button data-g="S"><span class="g">S</span>Sonido</button>
+    <button data-g="F"><span class="g">F</span>Sonido fuerte</button>
+    <button id="bDemo">▶ Demo automática</button>
+    <button id="bReset">↺ Reiniciar</button>
+    <button id="bArduino">◧ Ocultar Arduino</button>
+    <label>Cargar recursos<input id="file" type="file" multiple accept="image/*,audio/*,video/*" hidden></label>
+    <span class="sep"></span>
+    <span class="hint">Teclas: I P S F · D demo · R reiniciar · A Arduino · H ocultar controles · F11 pantalla completa</span>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIGURACIÓN (igual que Proyecto.pde) =====================
+const LARGO_PATRON = 5, TIEMPO_MAX = 5000, LIMITE_RAPIDO = 900;
+const DUR_APERTURA = 1800, DUR_ABIERTA = 45000, INTERVALO_OBJ = 600;
+const ESPERA = 0, GRABANDO = 1, ABRIENDO = 2, ABIERTA = 3;
+const COL = {I:'#f0b446', P:'#5ac8dc', S:'#c88ce6', F:'#f05a5a'};
+const NOMBRE = {I:'inclinar la maleta', P:'acercar la mano', S:'sonido medio', F:'sonido fuerte'};
+const SENSOR = {I:'sensor de inclinación → D3', P:'sensor infrarrojo → D4', S:'sensor de sonido → A0', F:'sensor de sonido → A0'};
+const CAT = ['movimiento', 'cercanía', 'sonido'];
+let credImg = [], credAud = [], credVid = [];
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = a => a < .5 ? 4 * a * a * a : 1 - Math.pow(-2 * a + 2, 3) / 2;
+
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  $('stage').style.transform = `translate(-50%,-50%) scale(${s})`;
+}
+addEventListener('resize', fit); fit();
+
+// ===================== ESTADO =====================
+let estado = ESPERA, inicioEstado = performance.now();
+let gestos = [], ritmos = [], ultimoGesto = 0, ultimoGestoVisual = -1e9;
+let contenido = {video: 0, audio: 0, objetos: [], codigo: ''};
+let demoRunning = false, demoToken = 0;
+const media = {imgs: [], auds: [], vids: []};
+
+function setEstado(e) { estado = e; inicioEstado = performance.now(); }
+
+// ===================== CIRCUITO (SVG) =====================
+const NS = 'http://www.w3.org/2000/svg';
+const svg = $('circuit');
+function el(tag, attrs, parent = svg) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  parent.appendChild(n); return n;
+}
+function txt(x, y, s, attrs = {}) {
+  const t = el('text', Object.assign({x, y, fill: '#efe6d8', 'font-size': 14, 'text-anchor': 'middle'}, attrs));
+  t.textContent = s; return t;
+}
+
+const sensores = [
+  {id: 'snd', nombre: 'Sensor de sonido', x: 40, color: '#1f4f8f', pins: ['VCC', 'GND', 'AO', 'DO']},
+  {id: 'tilt', nombre: 'Sensor de inclinación', x: 285, color: '#1f4f8f', pins: ['G', 'VCC', 'S', 'L']},
+  {id: 'ir', nombre: 'Sensor infrarrojo', x: 530, color: '#1f4f8f', pins: ['VCC', 'GND', 'OUT']},
+];
+const RAIL5 = 222, RAILG = 244, AY = 345;
+const ARD = {x: 110, y: 335, w: 560, h: 140};
+const APIN = {'5V': 190, 'GND': 245, 'A0': 340, 'D3': 470, 'D4': 600};
+const boards = {};
+const pinX = {};
+
+// Raíles de alimentación
+el('line', {x1: 30, y1: RAIL5, x2: 730, y2: RAIL5, stroke: '#d9433b', 'stroke-width': 3});
+el('line', {x1: 30, y1: RAILG, x2: 730, y2: RAILG, stroke: '#7a7a7a', 'stroke-width': 3});
+txt(30, RAIL5 - 6, '5V', {fill: '#d9433b', 'text-anchor': 'start', 'font-size': 12});
+txt(30, RAILG + 18, 'GND común', {fill: '#9a9a9a', 'text-anchor': 'start', 'font-size': 12});
+
+// Sensores
+for (const s of sensores) {
+  txt(s.x + 95, 26, s.nombre, {'font-size': 15, fill: '#d2ab5f'});
+  boards[s.id] = el('rect', {x: s.x, y: 38, width: 190, height: 112, rx: 10, fill: s.color, stroke: '#0f2b50', 'stroke-width': 2, class: 'board'});
+  // icono
+  if (s.id === 'snd') { el('circle', {cx: s.x + 95, cy: 78, r: 24, fill: '#222', stroke: '#888', 'stroke-width': 2}); el('circle', {cx: s.x + 95, cy: 78, r: 14, fill: '#3a3a3a'}); }
+  if (s.id === 'tilt') { el('rect', {x: s.x + 70, y: 58, width: 50, height: 40, rx: 8, fill: '#2a2a2a', stroke: '#777', 'stroke-width': 2}); el('circle', {cx: s.x + 95, cy: 78, r: 8, fill: '#bbb'}); }
+  if (s.id === 'ir') { el('circle', {cx: s.x + 75, cy: 76, r: 16, fill: '#dfe7ea', stroke: '#888'}); el('circle', {cx: s.x + 115, cy: 76, r: 16, fill: '#151515', stroke: '#888'}); }
+  const sep = s.pins.length === 4 ? 43 : 55, start = s.pins.length === 4 ? s.x + 30 : s.x + 40;
+  s.pins.forEach((p, i) => {
+    const px = start + i * sep; pinX[s.id + p] = px;
+    el('rect', {x: px - 5, y: 146, width: 10, height: 10, fill: '#c9c9c9'});
+    txt(px, 138, p, {'font-size': 12, fill: '#e8eef6'});
+  });
+}
+
+// Alimentación: VCC→5V, GND→GND (ojo: en el de inclinación G es tierra)
+function pw(x, toRail, color) { el('path', {d: `M${x},156 V${toRail}`, stroke: color, 'stroke-width': 3, fill: 'none'}); el('circle', {cx: x, cy: toRail, r: 4, fill: color}); }
+pw(pinX.sndVCC, RAIL5, '#d9433b'); pw(pinX.sndGND, RAILG, '#7a7a7a');
+pw(pinX.tiltVCC, RAIL5, '#d9433b'); pw(pinX.tiltG, RAILG, '#7a7a7a');
+pw(pinX.irVCC, RAIL5, '#d9433b'); pw(pinX.irGND, RAILG, '#7a7a7a');
+txt(pinX.tiltL, 176, 'sin conectar', {'font-size': 11, fill: '#9b8f80'});
+txt(pinX.sndDO, 176, 'opcional', {'font-size': 11, fill: '#9b8f80'});
+
+// Raíles → Arduino
+el('path', {d: `M${APIN['5V']},${RAIL5} V${AY}`, stroke: '#d9433b', 'stroke-width': 3, fill: 'none'});
+el('path', {d: `M${APIN.GND},${RAILG} V${AY}`, stroke: '#7a7a7a', 'stroke-width': 3, fill: 'none'});
+
+// Arduino
+el('rect', {x: ARD.x, y: ARD.y, width: ARD.w, height: ARD.h, rx: 14, fill: '#1d5f9e', stroke: '#0f3a66', 'stroke-width': 2});
+el('rect', {x: ARD.x + 40, y: ARD.y + 4, width: ARD.w - 70, height: 16, rx: 3, fill: '#111'});
+for (const k in APIN) {
+  el('rect', {x: APIN[k] - 6, y: ARD.y + 6, width: 12, height: 12, fill: '#d2ab5f'});
+  txt(APIN[k], ARD.y + 40, k, {'font-size': 14, 'font-weight': 700});
+}
+txt(ARD.x + ARD.w / 2 + 40, ARD.y + 95, 'ARDUINO UNO', {'font-size': 26, 'font-weight': 700, 'letter-spacing': 3});
+txt(ARD.x + ARD.w / 2 + 40, ARD.y + 120, 'lee · envía una línea cada ~45 ms', {'font-size': 13, fill: '#cfe0f2'});
+el('rect', {x: ARD.x - 30, y: ARD.y + 70, width: 50, height: 40, rx: 4, fill: '#b8b8b8'});
+el('path', {d: `M${ARD.x - 30},${ARD.y + 90} H10`, stroke: '#666', 'stroke-width': 8, fill: 'none'});
+txt(14, ARD.y + 150, 'USB → Processing', {'font-size': 12, fill: '#9b8f80', 'text-anchor': 'start'});
+
+// Señales
+const sigs = {};
+function sig(key, d, color, label, lx, ly) {
+  sigs[key] = {
+    p: el('path', {d, stroke: color, class: 'sig', style: `color:${color}`}),
+    f: el('path', {d, class: 'flowline'}),
+  };
+  txt(lx, ly, label, {'font-size': 12, fill: color, 'text-anchor': 'start', stroke: '#171412', 'stroke-width': 5, 'paint-order': 'stroke'});
+}
+sig('snd', `M${pinX.sndAO},156 V280 H${APIN.A0} V${AY}`, '#f2d24b', 'señal analógica', pinX.sndAO + 8, 275);
+sig('tilt', `M${pinX.tiltS},156 V296 H${APIN.D3} V${AY}`, '#f0a03c', 'digital 0/1', pinX.tiltS + 8, 291);
+sig('ir', `M${pinX.irOUT},156 V312 H${APIN.D4} V${AY}`, '#b07ce8', 'digital 0/1', APIN.D4 + 8, 307);
+
+function pulseWire(id, ms = 800) {
+  sigs[id].p.classList.add('on'); sigs[id].f.classList.add('on'); boards[id].classList.add('on');
+  clearTimeout(sigs[id].t);
+  sigs[id].t = setTimeout(() => { sigs[id].p.classList.remove('on'); sigs[id].f.classList.remove('on'); boards[id].classList.remove('on'); }, ms);
+}
+
+// ===================== MONITOR SERIE SIMULADO =====================
+const raw = {incl: 0, prox: 1, spikeUntil: 0, spikeLevel: 0};
+const lines = [];
+setInterval(() => {
+  const now = performance.now();
+  const hot = now < raw.spikeUntil;
+  const snd = hot ? Math.round(raw.spikeLevel + Math.random() * 20) : Math.round(8 + Math.random() * 14);
+  const isHot = hot || raw.incl === 1 || raw.prox === 0;
+  lines.push({s: `${snd},${raw.incl},${raw.prox}`, hot: isHot});
+  if (lines.length > 7) lines.shift();
+  $('serial').innerHTML = lines.map(l => `<div class="${l.hot ? 'hot' : ''}">${l.s}</div>`).join('');
+}, 90);
+
+// ===================== FLUJO =====================
+const steps = [...document.querySelectorAll('.step')];
+function flowStep(i, ms = 650) {
+  const s = steps[i]; s.classList.add('on');
+  clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove('on'), ms);
+}
+function flowGesture() { [0, 1, 2, 3, 4].forEach((i, k) => setTimeout(() => flowStep(i), k * 140)); }
+
+// ===================== SUBTÍTULOS =====================
+let capTimer;
+function caption(s, ms = 3800) {
+  const c = $('cap'); c.textContent = s; c.classList.add('on');
+  clearTimeout(capTimer); if (ms) capTimer = setTimeout(() => c.classList.remove('on'), ms);
+}
+
+// ===================== AUDIO (ejemplo con WebAudio) =====================
+let ac, master, pad = null, audioEl = null;
+function ensureAudio() {
+  if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = .5; master.connect(ac.destination); }
+  if (ac.state === 'suspended') ac.resume();
+}
+function blip(g) {
+  if (!ac) return;
+  const f = {I: 660, P: 880, S: 520, F: 330}[g];
+  const o = ac.createOscillator(), gg = ac.createGain(), t = ac.currentTime;
+  o.type = 'sine'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 1.5, t + .12);
+  gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(.18, t + .01); gg.gain.exponentialRampToValueAtTime(.001, t + .35);
+  o.connect(gg).connect(master); o.start(t); o.stop(t + .4);
+}
+const CHORDS = [[220, 277.2, 329.6], [196, 246.9, 293.7], [174.6, 220, 261.6], [164.8, 207.7, 246.9], [146.8, 185, 220], [261.6, 329.6, 392], [233.1, 293.7, 349.2]];
+let noise = null, fadeTimer = null;
+function noiseSet(level, freq, q, tc = .15) {
+  if (!ac) return;
+  if (!noise) {
+    const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1200; bp.Q.value = .6;
+    const g = ac.createGain(); g.gain.value = 0;
+    src.connect(bp).connect(g).connect(master); src.start(); noise = {bp, g};
+  }
+  const t = ac.currentTime;
+  noise.g.gain.cancelScheduledValues(t); noise.g.gain.setTargetAtTime(level, t, tc);
+  if (freq) noise.bp.frequency.setTargetAtTime(freq, t, .12);
+  if (q) noise.bp.Q.setTargetAtTime(q, t, .2);
+}
+function playAudio(k) {
+  stopAudio();
+  if (media.auds.length) {
+    audioEl = media.auds[k % media.auds.length]; audioEl.currentTime = 0; audioEl.loop = true; audioEl.volume = 0;
+    audioEl.play().catch(() => {});
+    const el = audioEl, t0 = performance.now() + 500;
+    clearInterval(fadeTimer);
+    fadeTimer = setInterval(() => { el.volume = clamp((performance.now() - t0) / 2500); if (el.volume >= 1) clearInterval(fadeTimer); }, 50);
+    return;
+  }
+  if (!ac) return;
+  const t = ac.currentTime, g = ac.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.1, t + 2); g.connect(master);
+  const oscs = [];
+  CHORDS[k % 7].forEach((f, i) => {
+    const o = ac.createOscillator(); o.type = i % 2 ? 'triangle' : 'sine'; o.frequency.value = f; o.connect(g); o.start(); oscs.push(o);
+    const o2 = ac.createOscillator(), g2 = ac.createGain(); o2.frequency.value = f * 2.004; g2.gain.value = .3; o2.connect(g2).connect(g); o2.start(); oscs.push(o2);
+  });
+  const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = .15 + k * .04; lg.gain.value = .04; lfo.connect(lg).connect(g.gain); lfo.start(); oscs.push(lfo);
+  pad = {g, oscs};
+}
+function stopAudio() {
+  clearInterval(fadeTimer);
+  if (audioEl) { audioEl.pause(); audioEl = null; }
+  if (pad && ac) {
+    const t = ac.currentTime; pad.g.gain.cancelScheduledValues(t); pad.g.gain.setValueAtTime(pad.g.gain.value, t); pad.g.gain.linearRampToValueAtTime(0, t + .8);
+    pad.oscs.forEach(o => o.stop(t + .9)); pad = null;
+  }
+}
+
+// ===================== INTERACCIÓN: EL CONTENIDO FLUYE Y LOS GESTOS LO FIJAN =====================
+// Mientras la maleta está cerrada todo se reproduce: un video de fondo, imágenes que pasan
+// por la ranura activa de la cerradura y voces que saltan entre emisoras con estática.
+// Cada gesto detectado por un sensor FIJA lo que estaba pasando en ese instante.
+// Con 5 fragmentos fijados la maleta se desbloquea y muestra su interpretación.
+
+let fijados = [];                 // {g, img, station, peak, dt}
+let slotImg = 0, slotTick = 0;    // imagen que pasa por la ranura activa
+let station = 0, stationNext = 0, stationAudio = null, burstUntil = 0;
+let bgVideo = 0, bgFlash = -1e9, primerGesto = 0;
+let iniciado = false, interp = null, fadeFinal = null;
+const nImg = () => media.imgs.length || 30;
+const nAud = () => media.auds.length || 7;
+const catOf = g => g === 'I' ? 0 : g === 'P' ? 1 : 2;
+const VCAT = ['movimiento', 'cercanía', 'voz'];
+
+function iniciar() {
+  ensureAudio();
+  if (iniciado) return;
+  iniciado = true;
+  setBgVideo(bgVideo);
+  tuneTo(Math.floor(Math.random() * nAud()));
+  stationNext = performance.now() + 3200;
+}
+
+function setBgVideo(i) {
+  const n = media.vids.length;
+  bgVideo = n ? i % n : i % 3;
+  bgFlash = performance.now();
+  if (!n) return;
+  media.vids.forEach((v, k) => { if (k !== bgVideo) v.pause(); });
+  media.vids[bgVideo].play().catch(() => {});
+}
+
+// Cambiar de emisora: ráfaga de estática y otra voz.
+function tuneTo(k) {
+  station = ((k % nAud()) + nAud()) % nAud();
+  burstUntil = performance.now() + 450;
+  noiseSet(.26, 600 + Math.random() * 2400, 1.2, .04);
+  setTimeout(() => { if (estado === ESPERA || estado === GRABANDO) noiseSet(.04 + .02 * fijados.length, 0, 0, .25); }, 420);
+  if (!media.auds.length) { playAudio(station); return; }
+  const a = media.auds[station];
+  if (stationAudio && stationAudio !== a) stationAudio.pause();
+  stationAudio = a; a.volume = .4;
+  if (a.paused) {
+    try { a.currentTime = Math.random() * Math.max(0, (a.duration || 60) - 20); } catch (e) {}
+    a.play().catch(() => {});
+  }
+}
+
+// ===================== GESTOS =====================
+function gesto(g) {
+  iniciar(); blip(g);
+  const now = performance.now();
+  if (g === 'I') { raw.incl = 1; setTimeout(() => raw.incl = 0, 700); pulseWire('tilt'); }
+  if (g === 'P') { raw.prox = 0; setTimeout(() => raw.prox = 1, 650); pulseWire('ir'); }
+  if (g === 'S') { raw.spikeUntil = now + 320; raw.spikeLevel = 55; pulseWire('snd'); }
+  if (g === 'F') { raw.spikeUntil = now + 320; raw.spikeLevel = 140; pulseWire('snd'); }
+  flowGesture();
+  setTimeout(() => registrarGesto(g), (g === 'S' || g === 'F') ? 260 : 60);
+}
+
+function registrarGesto(g) {
+  if (estado !== ESPERA && estado !== GRABANDO) return;
+  const now = performance.now();
+  if (estado === ESPERA) { gestos = []; ritmos = []; fijados = []; primerGesto = now; setEstado(GRABANDO); }
+  const dt = gestos.length ? now - ultimoGesto : 0;
+  ritmos.push(gestos.length === 0 ? '-' : (dt < LIMITE_RAPIDO ? 'r' : 'p'));
+  gestos.push(g);
+  const peak = g === 'F' ? 140 + Math.random() * 40 : g === 'S' ? 55 + Math.random() * 25 : 0;
+  fijados.push({g, img: slotImg, station, peak, dt});
+  ultimoGesto = now; ultimoGestoVisual = now;
+  setBgVideo(catOf(g));                       // el sensor cambia el video
+  if (!demoRunning) caption(`Gesto ${gestos.length} de ${LARGO_PATRON} · ${NOMBRE[g]} → se fija la imagen ${slotImg + 1} y la voz ${station + 1}`);
+  noiseSet(.04 + .02 * gestos.length, 400 + Math.random() * 2600, .6 + gestos.length * .9);
+  stationNext = now + 1400;
+  if (gestos.length >= LARGO_PATRON) abrir();
+}
+
+function abrir() {
+  const cuenta = [0, 0, 0], primera = [99, 99, 99];
+  gestos.forEach((g, i) => { const c = catOf(g); cuenta[c]++; if (primera[c] === 99) primera[c] = i; });
+  let m = 0; for (let c = 1; c < 3; c++) if (cuenta[c] > cuenta[m] || (cuenta[c] === cuenta[m] && primera[c] < primera[m])) m = c;
+  contenido.video = m;
+  contenido.audio = fijados[fijados.length - 1].station;
+  let h = 2166136261;
+  fijados.forEach(f => { for (const v of [f.g.charCodeAt(0), f.img, f.station, Math.round(f.dt / 100)]) { h ^= v; h = Math.imul(h, 16777619); } });
+  contenido.codigo = (h >>> 0).toString(16).toUpperCase().padStart(8, '0').slice(-6);
+  interp = interpretar();
+
+  setBgVideo(contenido.video);
+  noiseSet(0, 0, 0, .5);
+  if (media.auds.length) {
+    const a = media.auds[contenido.audio];
+    if (stationAudio && stationAudio !== a) stationAudio.pause();
+    stationAudio = a; a.play().catch(() => {});
+    clearInterval(fadeFinal);
+    fadeFinal = setInterval(() => { a.volume = Math.min(1, a.volume + .03); if (a.volume >= 1) clearInterval(fadeFinal); }, 60);
+  } else playAudio(contenido.audio);
+  setEstado(ABRIENDO);
+  setTimeout(() => flowStep(5, 2500), 600);
+  if (!demoRunning) caption(`Contenido fijado · la maleta se desbloquea · código ${contenido.codigo}`, 4500);
+}
+
+function cerrar() {
+  clearInterval(fadeFinal);
+  if (!media.auds.length) stopAudio();
+  gestos = []; ritmos = []; fijados = []; interp = null;
+  setEstado(ESPERA);
+  if (iniciado) { noiseSet(.04, 0, 0, .3); if (stationAudio) stationAudio.volume = .4; stationNext = performance.now() + 1500; }
+  else noiseSet(0, 0, 0, .2);
+}
+
+// Lectura de la interacción física y sonora del visitante.
+function interpretar() {
+  const c = {I: 0, P: 0, S: 0, F: 0};
+  fijados.forEach(f => c[f.g]++);
+  const rap = ritmos.filter(r => r === 'r').length;
+  const peak = Math.max(0, ...fijados.map(f => f.peak));
+  const seg = (ultimoGesto - primerGesto) / 1000;
+  const miradas = new Set(fijados.map(f => (credImg[f.img] || 'x').split(' · ')[0])).size;
+  const voces = new Set(fijados.map(f => f.station)).size;
+  const t = [];
+  t.push([
+    'Abriste la maleta con el cuerpo: la inclinaste y la volviste parte de tu recorrido. Tu lectura del museo es un desplazamiento entre salas.',
+    'Abriste la maleta acercándote: elegiste mirar de cerca, como quien busca lo que las cédulas no dicen.',
+    'Abriste la maleta con tu voz, y el museo te respondió con las voces de sus salas y visitantes.'][contenido.video]);
+  t.push(rap >= 3 ? 'Tu ritmo fue rápido: saltaste de fragmento en fragmento, como un recorrido que no se detiene.'
+    : rap <= 1 ? 'Hiciste pausas largas: tu recorrido se detuvo a escuchar y a volver a mirar.'
+    : 'Alternaste prisa y pausa: un recorrido que a veces se detiene.');
+  t.push(c.F ? 'Alzaste la voz al menos una vez: un sonido fuerte rompió el silencio de las vitrinas.'
+    : c.S ? 'Hablaste bajo, como se aprende a hablar en un museo.'
+    : 'No usaste tu voz: dejaste que hablaran las piezas.');
+  t.push(`En ${seg.toFixed(1)} segundos fijaste ${fijados.length} imágenes de ${miradas} miradas distintas y atrapaste ${voces} ${voces === 1 ? 'voz' : 'voces'}. Esta versión del relato es solo tuya.`);
+  return {
+    texto: t,
+    barras: [
+      ['Movimiento', c.I / 5, `${c.I} ${c.I === 1 ? 'gesto' : 'gestos'}`, COL.I],
+      ['Cercanía', c.P / 5, `${c.P} ${c.P === 1 ? 'gesto' : 'gestos'}`, COL.P],
+      ['Voz', (c.S + c.F) / 5, `${c.S + c.F} ${c.S + c.F === 1 ? 'gesto' : 'gestos'}`, COL.S],
+      ['Ritmo', rap / 4, rap >= 3 ? 'rápido' : rap <= 1 ? 'pausado' : 'mixto', '#e6cf9c'],
+      ['Intensidad', peak / 180, c.F ? 'fuerte' : c.S ? 'media' : 'silencio', COL.F],
+    ],
+  };
+}
+
+// ===================== DIBUJO =====================
+const cv = $('cv'), ctx = cv.getContext('2d');
+let W = 1050; const H = 700;
+function anchoCanvas(w) {
+  W = w; cv.width = W * 2; cv.height = H * 2; cv.style.width = W + 'px';
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+}
+anchoCanvas(1050);
+function alternarArduino() {
+  const st = $('stage'), oculto = st.classList.toggle('sinArduino');
+  anchoCanvas(oculto ? 1840 : 1050);
+  $('bArduino').textContent = oculto ? '◨ Mostrar Arduino' : '◧ Ocultar Arduino';
+  $('right').querySelector('.ptitle').innerHTML = oculto ? '<b>●</b>La maleta' : '<b>2</b>La maleta en pantalla (Processing)';
+}
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+function luz(g, x, y, d) {
+  ctx.save(); ctx.shadowColor = COL[g]; ctx.shadowBlur = 14;
+  ctx.fillStyle = COL[g]; ctx.beginPath(); ctx.arc(x, y, d / 2, 0, 7); ctx.fill(); ctx.restore();
+  ctx.fillStyle = '#1a1410'; ctx.font = `700 ${Math.round(d * .46)}px system-ui,sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(g, x, y + 1);
+}
+function ritmo(r, x, y) {
+  ctx.fillStyle = '#e6cf9c';
+  if (r === 'r') { ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fill(); } else ctx.fillRect(x - 6, y - 2, 12, 4);
+}
+function brass(x, y, w, h) {
+  const g = ctx.createLinearGradient(x, y, x, y + h); g.addColorStop(0, '#f0d38c'); g.addColorStop(1, '#a37b35');
+  ctx.fillStyle = g; rr(x, y, w, h, 6); ctx.fill(); ctx.strokeStyle = '#6b4f1f'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+function fitDraw(src, sw, sh, x, y, w, h) {
+  if (!sw || !sh) return;
+  const s = Math.min(w / sw, h / sh), a = sw * s, b = sh * s;
+  ctx.drawImage(src, x + (w - a) / 2, y + (h - b) / 2, a, b);
+}
+function coverDraw(src, sw, sh, x, y, w, h) {
+  if (!sw || !sh) return;
+  const s = Math.max(w / sw, h / sh), cw = w / s, ch = h / s;
+  ctx.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, x, y, w, h);
+}
+function estatica(x, y, w, h, n, alfa = .3) {
+  for (let i = 0; i < n; i++) { ctx.fillStyle = `rgba(255,255,255,${Math.random() * alfa})`; ctx.fillRect(x + Math.random() * w, y + Math.random() * h, 2, 2); }
+}
+function imagen(n, x, y, w, h, cover = true) {
+  const im = media.imgs[n];
+  if (im && im.naturalWidth) { (cover ? coverDraw : fitDraw)(im, im.naturalWidth, im.naturalHeight, x, y, w, h); return; }
+  const hue = (n * 47) % 360; ctx.fillStyle = `hsl(${hue},45%,35%)`; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#efe6d8'; ctx.font = '12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(n + 1, x + w / 2, y + h / 2);
+}
+function video(i, x, y, w, h, now, cover) {
+  const v = media.vids.length ? media.vids[i % media.vids.length] : null;
+  if (v && v.videoWidth) (cover ? coverDraw : fitDraw)(v, v.videoWidth, v.videoHeight, x, y, w, h);
+  else videoEjemplo(i, x, y, w, h, now);
+}
+function videoEjemplo(cat, x, y, w, h, now) {
+  const t = now / 1000, cx = x + w / 2, cy = y + h / 2;
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  for (let i = 0; i < 20; i++) {
+    ctx.strokeStyle = `hsla(${[30, 190, 285][cat] + i * 2},70%,55%,.4)`; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.ellipse(cx, cy, 30 + i * 14 + Math.sin(t + i) * 8, 12 + i * 8, t * .3 + i * .1, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+function wrap(text, x, y, maxW, lh) {
+  const words = text.split(' '); let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = w; } else line = test;
+  }
+  if (line) { ctx.fillText(line, x, y); y += lh; }
+  return y;
+}
+function etiqueta(s, x, y) {
+  ctx.font = '13px system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  const w = ctx.measureText(s).width + 20; ctx.fillStyle = 'rgba(0,0,0,.6)'; rr(x + 10, y + 10, w, 24, 12); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillText(s, x + 20, y + 15);
+}
+
+// Fondo: el video que está corriendo ahora, oscurecido.
+function fondo(now) {
+  video(bgVideo, 0, 0, W, H, now, true);
+  ctx.fillStyle = 'rgba(16,13,11,.74)'; ctx.fillRect(0, 0, W, H);
+  const d = now - bgFlash;
+  if (d < 350) estatica(0, 0, W, H, 900 * (1 - d / 350), .35);
+}
+
+function textosCerrada(now) {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#efe6d8'; ctx.font = '32px Georgia,serif'; ctx.fillText('¿Qué hay dentro de la maleta?', W / 2, 56);
+  ctx.fillStyle = '#b3a796'; ctx.font = '17px system-ui,sans-serif';
+  ctx.fillText('Todo está pasando a la vez. Tus gestos detienen lo que ves y lo que escuchas.', W / 2, 88);
+
+  // Dial de emisoras
+  const x0 = W / 2 - 280, x1 = W / 2 + 280, y = 548, n = nAud();
+  ctx.strokeStyle = 'rgba(210,171,95,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+  for (let i = 0; i < n; i++) {
+    const x = lerp(x0, x1, i / (n - 1));
+    ctx.fillStyle = i === station ? '#d2ab5f' : 'rgba(210,171,95,.45)'; ctx.fillRect(x - 1, y - 8, 2, 16);
+  }
+  const jit = now < burstUntil ? (Math.random() - .5) * 40 : 0;
+  const nx = lerp(x0, x1, station / (n - 1)) + jit;
+  ctx.fillStyle = '#f05a5a'; ctx.fillRect(nx - 2, y - 16, 4, 32);
+  ctx.fillStyle = '#d8cebf'; ctx.font = '15px system-ui,sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(now < burstUntil ? 'sintonizando…' : `Suena: ${credAud[station] || 'voz ' + (station + 1)}`, W / 2, y + 36);
+
+  const items = [['I', 'inclínala'], ['P', 'acerca tu mano'], ['S', 'haz un sonido'], ['F', 'sonido fuerte']];
+  items.forEach(([g, t], i) => {
+    const x = W / 2 - 400 + i * 205;
+    luz(g, x, 632, 24);
+    ctx.fillStyle = '#d8cebf'; ctx.font = '16px system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x + 20, 632);
+  });
+  ctx.textAlign = 'center'; ctx.fillStyle = '#8a7f72'; ctx.font = '14px system-ui,sans-serif';
+  ctx.fillText(`Cada gesto fija un fragmento. Con ${LARGO_PATRON} fragmentos la maleta se desbloquea.`, W / 2, 668);
+}
+
+function tapa(x, y, w, h, al, now) {
+  ctx.save(); ctx.globalAlpha = al;
+  ctx.strokeStyle = '#4a2c17'; ctx.lineWidth = 18; rr(x + w / 2 - 90, y - 58, 180, 76, 24); ctx.stroke();
+  const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#8f5832'); g.addColorStop(1, '#5a3218');
+  ctx.fillStyle = g; rr(x, y, w, h, 26); ctx.fill();
+  ctx.setLineDash([10, 7]); ctx.strokeStyle = 'rgba(235,195,145,.35)'; ctx.lineWidth = 2; rr(x + 16, y + 16, w - 32, h - 32, 18); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x, y + h * .2, w, 6);
+  brass(x + w * .13 - 32, y + h * .2 - 22, 64, 46); brass(x + w * .87 - 32, y + h * .2 - 22, 64, 46);
+
+  // Cerradura con 5 ranuras
+  const pw = 540, ph = 136, px = x + w / 2 - pw / 2, py = y + h * .6 - ph / 2;
+  ctx.fillStyle = '#1d1714'; rr(px, py, pw, ph, 16); ctx.fill(); ctx.strokeStyle = '#d2ab5f'; ctx.lineWidth = 3; ctx.stroke();
+  const sw = 88, sh = 66, gap = 14, sx0 = px + (pw - (5 * sw + 4 * gap)) / 2, sy = py + 14;
+  for (let i = 0; i < LARGO_PATRON; i++) {
+    const sx = sx0 + i * (sw + gap);
+    ctx.save(); rr(sx, sy, sw, sh, 6); ctx.clip();
+    ctx.fillStyle = '#0d0b0a'; ctx.fillRect(sx, sy, sw, sh);
+    if (i < fijados.length) imagen(fijados[i].img, sx, sy, sw, sh);
+    else if (i === fijados.length && (estado === ESPERA || estado === GRABANDO)) { imagen(slotImg, sx, sy, sw, sh); estatica(sx, sy, sw, sh, 120, .5); }
+    else estatica(sx, sy, sw, sh, 60, .18);
+    ctx.restore();
+    if (i < fijados.length) {
+      ctx.strokeStyle = COL[fijados[i].g]; ctx.lineWidth = 3; rr(sx, sy, sw, sh, 6); ctx.stroke();
+      luz(fijados[i].g, sx + 10, sy + 10, 20);
+      if (i > 0) ritmo(ritmos[i], sx - gap / 2, sy + sh / 2);
+    } else if (i === fijados.length) {
+      const b = .5 + .5 * Math.sin(now * .012);
+      ctx.strokeStyle = `rgba(210,171,95,${.4 + .6 * b})`; ctx.lineWidth = 2; rr(sx, sy, sw, sh, 6); ctx.stroke();
+    }
+  }
+  let s = 'CERRADA · haz tu primer gesto para fijar lo que pasa';
+  if (estado === GRABANDO) s = `${fijados.length} de ${LARGO_PATRON} fragmentos fijados`;
+  if (estado === ABRIENDO) s = 'CONTENIDO FIJADO · desbloqueando…';
+  ctx.fillStyle = '#e1cc9a'; ctx.font = '14px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(s, x + w / 2, py + 102);
+  if (estado === GRABANDO) {
+    const resto = clamp(1 - (now - ultimoGesto) / TIEMPO_MAX);
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(px + 40, py + 120, pw - 80, 4);
+    ctx.fillStyle = '#d2ab5f'; ctx.fillRect(px + 40, py + 120, (pw - 80) * resto, 4);
+  }
+  ctx.restore();
+}
+
+// Interior: video fijado + interpretación de la interacción.
+function interior(x, y, w, h, a, now) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(42,26,18,.96)'; rr(x, y, w, h, 26); ctx.fill();
+  ctx.fillStyle = 'rgba(60,24,34,.96)'; rr(x + 12, y + 12, w - 24, h - 24, 18); ctx.fill();
+  const pad = 22, zona = 58;
+  const vx = x + pad, vy = y + pad, vw = (w - pad * 3) * .5, vh = h - pad * 2 - zona;
+  const rx = vx + vw + pad, ry = vy, rw = w - pad * 3 - vw;
+  const t = estado === ABIERTA ? Math.max(0, now - inicioEstado) : 0;
+
+  ctx.save(); ctx.globalAlpha = a; rr(vx, vy, vw, vh, 10); ctx.clip();
+  ctx.fillStyle = '#0b0908'; ctx.fillRect(vx, vy, vw, vh);
+  video(contenido.video, vx, vy, vw, vh, now, false);
+  ctx.restore();
+  if (a >= 1) etiqueta(`VIDEO ${contenido.video + 1} · lo abriste con ${VCAT[contenido.video]}`, vx, vy);
+
+  if (estado === ABIERTA && interp) {
+    // Título
+    ctx.fillStyle = '#efe6d8'; ctx.font = '22px Georgia,serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('Tu interpretación del museo', rx, ry);
+    // Imagen grande que recorre los fragmentos fijados
+    const iy = ry + 36, ih = 190;
+    const k = Math.floor(t / 2200) % fijados.length;
+    ctx.save(); rr(rx, iy, rw, ih, 8); ctx.clip(); ctx.fillStyle = '#0b0908'; ctx.fillRect(rx, iy, rw, ih);
+    imagen(fijados[k].img, rx, iy, rw, ih, false); ctx.restore();
+    { const ft = `Foto: ${(credImg[fijados[k].img] || '').split(' · ')[0]}`; ctx.font = '12px system-ui,sans-serif';
+      const fw = ctx.measureText(ft).width + 14; ctx.fillStyle = 'rgba(0,0,0,.65)'; rr(rx + rw - fw - 6, iy + ih - 26, fw, 20, 10); ctx.fill();
+      ctx.fillStyle = 'rgba(239,230,216,.95)'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(ft, rx + rw - 13, iy + ih - 16); }
+    // Tira de miniaturas
+    const ty = iy + ih + 8, tw = (rw - 4 * 6) / 5, th = 46;
+    fijados.forEach((f, i) => {
+      const tx = rx + i * (tw + 6);
+      ctx.save(); rr(tx, ty, tw, th, 5); ctx.clip(); imagen(f.img, tx, ty, tw, th); ctx.restore();
+      ctx.strokeStyle = i === k ? '#efe6d8' : COL[f.g]; ctx.lineWidth = i === k ? 3 : 2; rr(tx, ty, tw, th, 5); ctx.stroke();
+      luz(f.g, tx + 9, ty + 9, 16);
+    });
+    // Barras del perfil de interacción
+    let by = ty + th + 16;
+    const p = ease(clamp((t - 600) / 1200));
+    interp.barras.forEach(([l, v, txt, c]) => {
+      ctx.fillStyle = '#d8cebf'; ctx.font = '13px system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(l, rx, by + 6);
+      ctx.fillStyle = 'rgba(255,255,255,.1)'; rr(rx + 92, by, rw - 180, 12, 6); ctx.fill();
+      ctx.fillStyle = c; rr(rx + 92, by, Math.max(4, (rw - 180) * clamp(v) * p), 12, 6); ctx.fill();
+      ctx.fillStyle = '#b3a796'; ctx.textAlign = 'right'; ctx.fillText(txt, rx + rw, by + 6);
+      by += 22;
+    });
+    // Lectura escrita
+    ctx.save(); ctx.globalAlpha = clamp((t - 1600) / 900);
+    ctx.fillStyle = '#efe6d8'; ctx.font = '14px system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    let yy = by + 8;
+    interp.texto.forEach(s => { yy = wrap(s, rx, yy, rw, 18) + 4; });
+    ctx.restore();
+  }
+
+  if (a >= 1) {
+    const fy = y + h - pad - zona + 10, fh = zona - 10, cy = fy + fh / 2;
+    ctx.fillStyle = '#efe6d8'; ctx.font = '15px system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('Tus gestos:', x + pad, cy);
+    for (let i = 0; i < gestos.length; i++) {
+      const px = x + pad + 105 + i * 46;
+      if (i > 0) ritmo(ritmos[i], px - 23, cy);
+      luz(gestos[i], px, cy, 28);
+    }
+    const au = credAud[contenido.audio] || `voz ${contenido.audio + 1}`;
+    ctx.fillStyle = '#efe6d8'; ctx.textAlign = 'right'; ctx.font = '15px system-ui,sans-serif';
+    ctx.fillText(`Código ${contenido.codigo}`, x + w - pad, cy - 10);
+    ctx.fillStyle = '#c9b48a'; ctx.font = '13px system-ui,sans-serif';
+    ctx.fillText(`Voz atrapada: ${au}`, x + w - pad, cy + 11);
+    const resto = clamp(1 - (now - inicioEstado) / DUR_ABIERTA);
+    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(x + pad, fy + fh - 3, w - pad * 2, 3);
+    ctx.fillStyle = '#d2ab5f'; ctx.fillRect(x + pad, fy + fh - 3, (w - pad * 2) * resto, 3);
+  }
+  ctx.restore();
+}
+
+function frame(now) {
+  const t = now - inicioEstado;
+  if (estado === GRABANDO && now - ultimoGesto > TIEMPO_MAX) {
+    cerrar();
+    caption('El patrón se desvaneció: pasaron más de 5 segundos sin gestos. Lo fijado se libera.');
+  }
+  if (estado === ABRIENDO && t >= DUR_APERTURA) setEstado(ABIERTA);
+  if (estado === ABIERTA && t >= DUR_ABIERTA) cerrar();
+
+  // El contenido fluye mientras la maleta está cerrada.
+  if (estado === ESPERA || estado === GRABANDO) {
+    if (now - slotTick > 140) { slotImg = (slotImg + 1 + Math.floor(Math.random() * 5)) % nImg(); slotTick = now; }
+    if (iniciado && now > stationNext) { tuneTo(station + 1 + Math.floor(Math.random() * 3)); stationNext = now + 2600 + Math.random() * 1600; }
+  }
+
+  let a = estado === ABRIENDO ? clamp(t / DUR_APERTURA) : estado === ABIERTA ? 1 : 0;
+  a = ease(a);
+
+  ctx.fillStyle = '#120f0d'; ctx.fillRect(0, 0, W, H);
+  fondo(now);
+  const cw = 660, ch = 320, cx = (W - cw) / 2, cy = 175;
+  const x = lerp(cx, 18, a), y = lerp(cy, 14, a), w = lerp(cw, W - 36, a), h = lerp(ch, H - 28, a);
+  let dx = 0; const d = now - ultimoGestoVisual;
+  if (d < 300 && a === 0) dx = Math.sin(d * .09) * 8 * (1 - d / 300);
+  if (estado === ESPERA || estado === GRABANDO) textosCerrada(now);
+  if (a > 0) interior(x, y, w, h, a, now);
+  if (a < 1) tapa(cx + dx, cy - a * (ch + 320), cw, ch, 1 - a, now);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ===================== DEMO AUTOMÁTICA (para grabar) =====================
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function demo() {
+  iniciar();
+  const tok = ++demoToken; demoRunning = true; cerrar();
+  const ok = () => tok === demoToken;
+  const paso = async (ms, fn) => { await sleep(ms); if (!ok()) throw 0; fn && fn(); };
+  try {
+    await paso(300, () => caption('La maleta está viva: imágenes, voces y video pasan sin detenerse', 3600));
+    await paso(3800, () => { gesto('I'); caption('Inclina la maleta → D3 · se fija la imagen que pasaba en ese instante', 2600); });
+    await paso(900, () => { gesto('P'); caption('Acerca la mano → D4 · el video cambia y se fija otro fragmento', 2600); });
+    await paso(1800, () => { gesto('S'); caption('Habla → A0 · la maleta atrapa la voz que estaba sonando', 2600); });
+    await paso(800, () => gesto('S'));
+    await paso(1900, () => { gesto('F'); caption('Aplaude → quinto gesto: el contenido queda fijado y la maleta se desbloquea', 2800); });
+    await paso(3000, () => caption('La maleta interpreta tu interacción: cuánto te moviste, te acercaste o hablaste, y con qué ritmo', 5200));
+    await paso(5400, () => caption('Esa lectura es única: nadie más fijó estos mismos fragmentos', 4000));
+    await paso(4400, () => { cerrar(); caption('Persona 2: otro cuerpo, otro ritmo, otra voz', 3000); });
+    await paso(3200, () => gesto('P'));
+    await paso(1600, () => gesto('P'));
+    await paso(700, () => gesto('I'));
+    await paso(1700, () => gesto('F'));
+    await paso(800, () => gesto('I'));
+    await paso(3000, () => caption('Otra interacción, otra interpretación del museo', 4400));
+    await paso(5000, () => caption('¿Quién narra Mesoamérica? Esta vez, quien visita', 4000));
+    await paso(4400, () => cerrar());
+  } catch (e) {}
+  if (ok()) demoRunning = false;
+}
+
+// ===================== CONTROLES =====================
+document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { demoToken++; demoRunning = false; gesto(b.dataset.g); });
+$('bDemo').onclick = demo;
+$('bArduino').onclick = alternarArduino;
+$('bReset').onclick = () => { demoToken++; demoRunning = false; cerrar(); caption('Maleta reiniciada', 1800); };
+addEventListener('keydown', e => {
+  if (e.target.isContentEditable) return;
+  const k = e.key.toLowerCase();
+  if ('ipsf'.includes(k) && k.length === 1) { demoToken++; demoRunning = false; gesto(k.toUpperCase()); }
+  else if (k === 'd') demo();
+  else if (k === 'r') $('bReset').click();
+  else if (k === 'h') $('stage').classList.toggle('clean');
+  else if (k === 'a') alternarArduino();
+});
+
+async function autoload() {
+  const txt = async u => { const r = await fetch(u); if (!r.ok) throw 0; return (await r.text()).trim().split('\n'); };
+  try {
+    credImg = await txt('img/creditos.txt');
+    credAud = await txt('aud/creditos.txt').catch(() => []);
+    credVid = await txt('video/creditos.txt').catch(() => []);
+    media.imgs = credImg.map((_, i) => { const im = new Image(); im.src = `img/${i + 1}.jpg`; return im; });
+    media.auds = [...Array(7).keys()].map(i => { const a = new Audio(`aud/${i + 1}.mp3`); a.preload = 'auto'; a.loop = true; return a; });
+    media.vids = [...Array(3).keys()].map(i => { const v = document.createElement('video'); v.src = `video/${i + 1}.mp4`; v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto'; return v; });
+  } catch (e) { /* sin recursos: contenido de ejemplo */ }
+}
+autoload().then(() => setBgVideo(0));
+addEventListener('pointerdown', () => iniciar());
+
+// Cargar los recursos reales (imágenes, audios, videos)
+$('file').onchange = e => {
+  const files = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+  const imgs = [], auds = [], vids = [];
+  for (const f of files) {
+    const url = URL.createObjectURL(f);
+    if (f.type.startsWith('image/')) { const im = new Image(); im.src = url; imgs.push(im); }
+    else if (f.type.startsWith('audio/')) { const au = new Audio(url); au.loop = true; auds.push(au); }
+    else if (f.type.startsWith('video/')) { const v = document.createElement('video'); v.src = url; v.muted = true; v.loop = true; v.playsInline = true; vids.push(v); }
+  }
+  if (imgs.length) media.imgs = imgs;
+  if (auds.length) media.auds = auds;
+  if (vids.length) media.vids = vids;
+  cerrar();
+  caption(`Recursos cargados: ${media.imgs.length} imágenes · ${media.auds.length} audios · ${media.vids.length} videos`, 4000);
+};
+</script>
+</body>
+</html>
